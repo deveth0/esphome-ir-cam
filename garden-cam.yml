@@ -78,13 +78,15 @@ esp32_camera:
   power_down_pin: GPIO32
   resolution: 1600x1200
   idle_framerate: 1fps
-  max_framerate: 1fps
+  max_framerate: 5fps
   brightness: 0
   saturation: 0
   contrast: 0
   special_effect: grayscale
 
-
+esp32_camera_web_server:
+- port: 8080
+  mode: stream
 
 deep_sleep:
   id: deep_sleep_control
