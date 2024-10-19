@@ -1,0 +1,116 @@
+
+esphome:
+  name: esp32-cam
+  friendly_name: esp32-cam
+  
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+ota:
+  platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid 
+  password: !secret wifi_password
+  fast_connect: true
+  ap: {}
+
+captive_portal:
+
+logger:
+  level: DEBUG
+
+api:
+  password: ""
+  on_client_connected:
+    - output.turn_on: ir_light
+    - delay: 1000ms 
+    - logger.log: Calling snapshot service
+    - homeassistant.service:
+         service: camera.snapshot
+         data:
+           entity_id: camera.esp32_cam_garden_cam
+           filename: '/config/www/camera_snapshots/snapshot-garden.jpg'
+    - delay: 1000ms
+    - homeassistant.service:
+         service: local_file.update_file_path
+         data:
+           entity_id: camera.mailbox_snapshot
+           file_path: '/config/www/camera_snapshots/snapshot-garden.jpg'
+    - logger.log: Called snapshot service
+    - output.turn_off: ir_light
+
+time:
+  - platform: homeassistant
+    id: esptime
+
+# Enable more information logged into homeassistant
+debug:
+  update_interval: 5s
+#
+text_sensor:
+  - platform: debug
+    device:
+      name: "Device Info"
+    reset_reason:
+      name: "Reset Reason"
+
+output:
+  - id: ir_light
+    platform: gpio
+    pin: GPIO13
+
+esp32_camera:
+  id: garden_cam
+  name: garden-cam
+  external_clock:
+    pin: GPIO0
+    frequency: 10MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 1600x1200
+  idle_framerate: 1fps
+  max_framerate: 1fps
+  brightness: 0
+  saturation: 0
+  contrast: 0
+  special_effect: grayscale
+
+
+
+deep_sleep:
+  id: deep_sleep_control
+  run_duration: 30s
+  sleep_duration: 30s # once an hour
+
+binary_sensor:
+  - platform: homeassistant
+    id: enable_deep_sleep
+    name: Enable Deep Sleep
+    entity_id: input_boolean.enable_esphome_deepsleep
+    publish_initial_state: true
+    on_state:
+      then:
+        - script.execute: consider_deep_sleep
+
+script:
+  - id: consider_deep_sleep
+    mode: queued
+    then:
+      - if:
+          condition:
+            binary_sensor.is_off: enable_deep_sleep
+          then:
+            - logger.log: 'Skipping sleep, per enable_deep_sleep'
+            - deep_sleep.prevent: deep_sleep_control
+          else:
+            - logger.log: 'Enable sleep, per enable_deep_sleep'
+            - deep_sleep.allow: deep_sleep_control
